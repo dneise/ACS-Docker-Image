@@ -2,10 +2,10 @@ FROM centos:8 AS base
 # ================ Builder stage =============================================
 # we base our image on a vanilla Centos 8 image.
 
-ARG ACS_VERSION="2020.8"
+ARG ACS_VERSION
 ENV ACS_VERSION=$ACS_VERSION
 
-ARG ACS_TAG="2020AUG"
+ARG ACS_TAG
 ENV ACS_TAG=$ACS_TAG
 
 ENV ACS_PREFIX=/alma
