@@ -1,27 +1,25 @@
-FROM centos:7 AS base
+FROM centos:8 AS base
 # ================ Builder stage =============================================
-# we base our image on a vanilla Centos 7 image.
+# we base our image on a vanilla Centos 8 image.
 
-ENV ACS_PREFIX=/alma ACS_VERSION="2020.8"
+ARG ACS_VERSION="2020.8"
+ENV ACS_VERSION=$ACS_VERSION
 
-ENV ACS_ROOT=$ACS_PREFIX/acs
+ARG ACS_TAG="2020AUG"
+ENV ACS_TAG=$ACS_TAG
+
+ENV ACS_PREFIX=/alma
+ENV ACS_ROOT="${ACS_PREFIX}/ACS-${ACS_TAG}"
 
 ENV JAVA_HOME="/usr/java/default"
 
-# install deltarpm prior to installing everything else
-# it might save some time during downloading and installing the
-# dependencies below, but it is not urgently needed for ACS to work
-# c.f. https://www.cyberciti.biz/faq/delta-rpms-disabled-because-applydeltarpm-not-installed/
-RUN yum update -y && yum install -y deltarpm && \
 # The package list below is alphabetically sorted, so not sorted by importance.
 # It may very well be, that noe all packages are actually needed.
 # If you studied this, and found out we can shorten this list without loosing
 # the ability to execute all the ACS examples, we'd be happy to hear from you
 # either by opening an issue, or by you immediately fixing this and opening a
 # pull request.
-    yum -y install epel-release && \
-    yum -y groupinstall "Development Tools" && \
-    yum -y install  autoconf \
+RUN yum install -y  autoconf \
                     bison \
                     bzip2 \
                     bzip2-devel \
@@ -37,14 +35,11 @@ RUN yum update -y && yum install -y deltarpm && \
                     git \
                     java-11-openjdk \
                     java-11-openjdk-devel \
-                    lbzip2 \
-                    lbzip2-utils \
                     libffi \
                     libffi-devel \
                     libX11-devel \
                     libxml2-devel \
                     libxslt-devel \
-                    lockfile-progs \
                     make \
                     net-tools \
                     openldap-devel \
@@ -52,7 +47,6 @@ RUN yum update -y && yum install -y deltarpm && \
                     openssl-devel \
                     perl \
                     procmail \
-                    python-devel \
                     python2-pip \
                     python3-pip \
                     readline-devel \
@@ -79,15 +73,16 @@ RUN yum -y install  \
 	mc \
 	nc \
 	patch \
+        # Needed by buildJacOrb
+	rsync \
 	screen \
 	subversion \
+	tree \
 	unzip \
 	vim \
 	wget \
-	tree \
 	xterm && \
 	cd /acs/ExtProd/PRODUCTS && \
-
     ## Get missing (super old) libraries
     wget https://sourceforge.net/projects/gnuplot-py/files/Gnuplot-py/1.8/gnuplot-py-1.8.tar.gz/download -O gnuplot-py-1.8.tar.gz && \
     wget https://sourceforge.net/projects/pychecker/files/pychecker/0.8.17/pychecker-0.8.17.tar.gz/download -O pychecker-0.8.17.tar.gz && \
@@ -99,7 +94,7 @@ RUN yum -y install  \
     cd /acs/ExtProd/INSTALL && \
     source /acs/LGPL/acsBUILD/config/.acs/.bash_profile.acs && \
     time make all && \
-    find /alma -name "*.o" -exec rm -v {} \;
+    find /alma -name "*.o" -exec rm {} \;
 # --------------------- Here external dependencies are built --------------
 
 FROM dependency_builder as acs_builder
@@ -108,21 +103,11 @@ RUN cd /acs/ && \
     source /acs/LGPL/acsBUILD/config/.acs/.bash_profile.acs && \
     time make build
 
-
 # ============= Target image stage ===========================================
 FROM base
 
 WORKDIR /
 
-# Here we create the user almamgr
-RUN  groupadd -g 1000 almamgr && \
-     useradd -g 1000 -u 1000 -d /home/almamgr -m -s /bin/bash almamgr && \
-     passwd -d almamgr && \
-# For conveniece we source the alma .bash_profile.acs in the user .bash_rc
-# and export JAVA_HOME
-     echo "source /alma/ACS-2020AUG/ACSSW/config/.acs/.bash_profile.acs" >> /home/almamgr/.bashrc && \
-     echo "export JAVA_HOME=$JAVA_HOME" >> /home/almamgr/.bashrc
+COPY --from=acs_builder /alma /alma
 
-COPY --from=acs_builder --chown=almamgr /alma /alma
-
-USER almamgr
+RUN ln -sv $ACS_ROOT/ACSSW/config/.acs/.bash_profile.acs /alma
