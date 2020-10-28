@@ -1,5 +1,0 @@
-#!/bin/bash
-
-echo "THIS IS CHECKOUT"
-
-exit -1
